@@ -24,7 +24,8 @@
         {
           "android": {
             "newArchEnabled": true,
-            "minSdkVersion": 24
+            "minSdkVersion": 24,
+            "kotlinVersion": "1.9.25"
           },
           "ios": {
             "newArchEnabled": true
