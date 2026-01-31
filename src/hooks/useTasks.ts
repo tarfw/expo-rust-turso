@@ -15,7 +15,7 @@ export function useTasks() {
   // Load tasks from local database
   const loadTasks = useCallback(async () => {
     if (!db || !user) return;
-    
+
     try {
       const rows = await db.all('SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at DESC', [user.id]);
       setTasks(rows as unknown as Task[]);
@@ -75,7 +75,7 @@ export function useTasks() {
     const setClause = Object.keys(updates)
       .map(key => `${key} = ?`)
       .join(', ');
-    
+
     const values = Object.values(updates);
     values.push(new Date().toISOString()); // updated_at
     values.push(id);
@@ -114,7 +114,7 @@ export function useTasks() {
   // Sync with cloud
   const sync = async (): Promise<void> => {
     if (!db) return;
-    
+
     setIsSyncing(true);
     try {
       await databaseManager.sync();
@@ -127,7 +127,7 @@ export function useTasks() {
   // Pull from cloud
   const pull = async (): Promise<void> => {
     if (!db) return;
-    
+
     setIsSyncing(true);
     try {
       await databaseManager.pull();
@@ -140,7 +140,7 @@ export function useTasks() {
   // Push to cloud
   const push = async (): Promise<void> => {
     if (!db) return;
-    
+
     setIsSyncing(true);
     try {
       await databaseManager.push();

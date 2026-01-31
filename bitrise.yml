@@ -1,0 +1,132 @@
+format_version: '13'
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+project_type: react-native
+workflows:
+  # Development build with dev client
+  development:
+    description: Build development APK with dev client and Turso SDK
+    steps:
+    - activate-ssh-key@4: {}
+    - git-clone@8: {}
+    
+    # Setup environment
+    - script@1:
+        title: Setup Rust & NDK
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -ex
+            
+            # Install Rust
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source $HOME/.cargo/env
+            
+            # Add Android targets
+            rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+            
+            # Setup NDK
+            export NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
+            echo "NDK_HOME=$NDK_HOME" >> $BITRISE_ENV_FILE
+            
+            # Verify
+            rustc --version
+            echo "Rust and NDK configured"
+    
+    # Install dependencies
+    - yarn@0:
+        inputs:
+        - workdir: $BITRISE_SOURCE_DIR
+        - command: install
+    
+    # Prebuild Android project
+    - script@1:
+        title: Prebuild Android
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -ex
+            cd $BITRISE_SOURCE_DIR
+            npx expo prebuild --platform android
+    
+    # Build APK
+    - install-missing-android-tools@3:
+        inputs:
+        - gradlew_path: $BITRISE_SOURCE_DIR/android/gradlew
+    
+    - android-build@1:
+        inputs:
+        - project_location: $BITRISE_SOURCE_DIR/android
+        - module: app
+        - build_type: apk
+        - variant: debug
+    
+    # Deploy
+    - deploy-to-bitrise-io@2:
+        inputs:
+        - notify_user_groups: none
+
+  # Production build
+  production:
+    description: Build production APK
+    steps:
+    - activate-ssh-key@4: {}
+    - git-clone@8: {}
+    
+    - script@1:
+        title: Setup Rust & NDK
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -ex
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source $HOME/.cargo/env
+            rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+            export NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
+            echo "NDK_HOME=$NDK_HOME" >> $BITRISE_ENV_FILE
+    
+    - yarn@0:
+        inputs:
+        - workdir: $BITRISE_SOURCE_DIR
+        - command: install
+    
+    - script@1:
+        title: Prebuild Android
+        inputs:
+        - content: |
+            #!/bin/bash
+            set -ex
+            cd $BITRISE_SOURCE_DIR
+            npx expo prebuild --platform android
+    
+    - install-missing-android-tools@3:
+        inputs:
+        - gradlew_path: $BITRISE_SOURCE_DIR/android/gradlew
+    
+    - android-build@1:
+        inputs:
+        - project_location: $BITRISE_SOURCE_DIR/android
+        - module: app
+        - build_type: apk
+        - variant: release
+    
+    - deploy-to-bitrise-io@2:
+        inputs:
+        - notify_user_groups: none
+
+app:
+  envs:
+  - opts:
+      is_expand: false
+    EXPO_PUBLIC_SUPABASE_URL: $EXPO_PUBLIC_SUPABASE_URL
+  - opts:
+      is_expand: false
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: $EXPO_PUBLIC_SUPABASE_ANON_KEY
+  - opts:
+      is_expand: false
+    EXPO_PUBLIC_TURSO_URL: $EXPO_PUBLIC_TURSO_URL
+  - opts:
+      is_expand: false
+    EXPO_PUBLIC_TURSO_TOKEN: $EXPO_PUBLIC_TURSO_TOKEN
+  - opts:
+      is_expand: false
+    EXPO_PUBLIC_TURSO_AUTH_TOKEN: $EXPO_PUBLIC_TURSO_AUTH_TOKEN

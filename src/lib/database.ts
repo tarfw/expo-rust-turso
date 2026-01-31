@@ -13,11 +13,11 @@ class DatabaseManager {
 
   async initialize(userId: string): Promise<Database> {
     this.userId = userId;
-    
+
     // Create a unique local database name per user
     const localDbName = `tasks_${userId}.db`;
     const dbPath = getDbPath(localDbName);
-    
+
     this.db = new Database({
       path: dbPath,
       url: TURSO_URL,
@@ -29,10 +29,10 @@ class DatabaseManager {
 
     // Initialize schema
     await this.initializeSchema();
-    
+
     // Pull initial data from cloud
     await this.pull();
-    
+
     return this.db;
   }
 
@@ -67,7 +67,7 @@ class DatabaseManager {
 
   async pull(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
-    
+
     try {
       await this.db.pull();
       await this.updateSyncMetadata('pull', 'success');
@@ -81,7 +81,7 @@ class DatabaseManager {
 
   async push(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
-    
+
     try {
       await this.db.push();
       await this.updateSyncMetadata('push', 'success');
@@ -95,7 +95,7 @@ class DatabaseManager {
 
   async sync(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
-    
+
     try {
       await this.db.sync();
       await this.updateSyncMetadata('sync', 'success');
@@ -109,7 +109,7 @@ class DatabaseManager {
 
   private async updateSyncMetadata(type: 'pull' | 'push' | 'sync', status: 'success' | 'error'): Promise<void> {
     if (!this.db) return;
-    
+
     try {
       await this.db.run(`
         INSERT INTO sync_metadata (id, last_sync_at, last_sync_status)

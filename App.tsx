@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
