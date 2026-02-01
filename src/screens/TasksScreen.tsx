@@ -141,7 +141,9 @@ function SyncButton({
 }
 
 export function TasksScreen() {
+  console.log('[TasksScreen] Rendering...');
   const { tasks, isLoading, isSyncing, createTask, toggleTask, deleteTask, pull, push } = useTasks();
+  console.log(`[TasksScreen] Hook state: tasks=${tasks.length}, isLoading=${isLoading}`);
   const { signOut, user } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');

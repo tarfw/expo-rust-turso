@@ -8,10 +8,12 @@ import { TasksScreen } from './src/screens/TasksScreen';
 function AppContent() {
   const { isLoading, isAuthenticated } = useAuth();
 
+  console.log(`[App] Rendering: isLoading=${isLoading}, isAuthenticated=${isAuthenticated}`);
+
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }

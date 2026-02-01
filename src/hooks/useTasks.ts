@@ -5,12 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 
 export function useTasks() {
-  const { user } = useAuth();
+  const { user, db } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  const db = databaseManager.getDatabase();
 
   // Load tasks from local database (Collaborative: Load all tasks in the tenant DB)
   const loadTasks = useCallback(async () => {
@@ -29,9 +27,23 @@ export function useTasks() {
 
   // Initial load
   useEffect(() => {
-    if (db && user) {
-      loadTasks();
-    }
+    const init = async () => {
+      if (db && user) {
+        setIsLoading(true);
+        try {
+          // Perform an initial pull to get tasks from cloud
+          console.log('[useTasks] Initial pull starting...');
+          await databaseManager.pull();
+          console.log('[useTasks] Initial pull completed.');
+        } catch (error) {
+          console.warn('[useTasks] Initial pull failed (this is normal on fresh installs):', error);
+        } finally {
+          await loadTasks();
+          setIsLoading(false);
+        }
+      }
+    };
+    init();
   }, [db, user, loadTasks]);
 
   // Create task

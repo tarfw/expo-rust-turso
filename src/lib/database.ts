@@ -122,29 +122,38 @@ class DatabaseManager {
   async pull(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    try {
-      await this.db.pull();
+    await this.withRetry(async () => {
+      await this.db!.pull();
       await this.updateSyncMetadata('pull', 'success');
       console.log('✅ Pull completed successfully');
-    } catch (error) {
-      await this.updateSyncMetadata('pull', 'error');
-      console.error('❌ Pull failed:', error);
-      throw error;
-    }
+    }, 'Pull');
   }
 
   async push(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    try {
-      await this.db.push();
+    await this.withRetry(async () => {
+      await this.db!.push();
       await this.updateSyncMetadata('push', 'success');
       console.log('✅ Push completed successfully');
-    } catch (error) {
-      await this.updateSyncMetadata('push', 'error');
-      console.error('❌ Push failed:', error);
-      throw error;
+    }, 'Push');
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+    let delay = 1000;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        const isTransient = error?.message?.includes('500') || error?.message?.includes('busy');
+        if (i === maxRetries - 1 || !isTransient) throw error;
+
+        console.warn(`[${new Date().toLocaleTimeString('en-GB')}] 🕒 ${label} failed (attempt ${i + 1}/${maxRetries}). Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
     }
+    throw new Error(`${label} failed after ${maxRetries} attempts`);
   }
 
   async sync(): Promise<void> {
@@ -183,10 +192,11 @@ class DatabaseManager {
 
   async close(): Promise<void> {
     if (this.db) {
-      await this.push(); // Push any pending changes before closing
+      await this.push().catch(() => { }); // Attempt push but don't block on error
       await this.db.close();
       this.db = null;
       this.userId = null;
+      this.currentTenantId = null;
     }
   }
 }

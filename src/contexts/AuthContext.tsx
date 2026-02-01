@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, User } from '../lib/supabase';
 import { databaseManager } from '../lib/database';
+// Triggering a refresh to clear stale Metro cache
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  db: any | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -15,10 +17,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [db, setDb] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const syncTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isInitializingRef = React.useRef<boolean>(false);
+  const currentSessionUserRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     const initTenantDb = async (userId: string) => {
+      // Prevent parallel initializations for the same user
+      if (isInitializingRef.current) {
+        console.log(`[${new Date().toLocaleTimeString('en-GB')}] ⏳ Auth init already in progress, skipping duplicate call...`);
+        return;
+      }
+
+      isInitializingRef.current = true;
+      currentSessionUserRef.current = userId;
+
+      // Clear any pending sync from a previous attempt/session
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
       try {
         console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🏦 Fetching tenant info for user: ${userId}`);
 
@@ -56,41 +76,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        await databaseManager.initialize(
+        const initializedDb = await databaseManager.initialize(
           tenant.id,
           tenant.turso_url,
           tenant.turso_token,
           userId
         );
+        setDb(initializedDb);
 
-        // Trigger initial sync in the background after 3 seconds
-        setTimeout(async () => {
-          try {
-            console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🔄 Triggering background auto-sync...`);
-            await databaseManager.pull();
-            console.log(`[${new Date().toLocaleTimeString('en-GB')}] ✅ Background auto-sync completed`);
-          } catch (e) {
-            console.warn(`[${new Date().toLocaleTimeString('en-GB')}] ⚠️ Background sync failed (this is normal if Turso is busy):`, e);
-          }
-        }, 3000);
+        /* Initial sync moved to useTasks hook to ensure proper UI coordination */
       } catch (err) {
         console.error('Failed to initialize multi-tenant DB:', err);
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        console.log(`[${new Date().toLocaleTimeString('en-GB')}] 👤 User ID obtained from session: ${session.user.id}`);
-        setUser({
-          id: session.user.id,
-          email: session.user.email!,
-          created_at: session.user.created_at,
-        });
-        initTenantDb(session.user.id);
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log(`[${new Date().toLocaleTimeString('en-GB')}] 👤 User ID from session: ${session.user.id}`);
+          setUser({
+            id: session.user.id,
+            email: session.user.email!,
+            created_at: session.user.created_at,
+          });
+          await initTenantDb(session.user.id);
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    };
+    checkSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -103,7 +123,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         await initTenantDb(session.user.id);
       } else if (event === 'SIGNED_OUT') {
+        currentSessionUserRef.current = null;
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+          syncTimeoutRef.current = null;
+        }
         setUser(null);
+        setDb(null);
         await databaseManager.close();
       }
     });
@@ -122,14 +148,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await databaseManager.push(); // Push any pending changes
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      // Attempt to push pending changes with a 2-second timeout
+      // This ensures sign-out isn't blocked if the network is flaky or Turso is busy
+      await Promise.race([
+        databaseManager.push(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Push timeout')), 2000))
+      ]).catch(err => console.warn('Sign-out: push failed or timed out:', err));
+
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } catch (err) {
+      console.error('Sign-out failed:', err);
+      // Even if error, we might want to force state reset
+      setUser(null);
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
+      db,
       isLoading,
       isAuthenticated: !!user,
       signIn,
