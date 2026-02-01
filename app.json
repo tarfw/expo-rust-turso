@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Turso Tasks App",
-    "slug": "turso-tasks-app",
+    "name": "silvers",
+    "slug": "silvers",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -10,13 +10,13 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tarapp.tursotasks"
+      "bundleIdentifier": "com.wetar5.silvers"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       },
-      "package": "com.tarapp.tursotasks"
+      "package": "com.wetar5.silvers"
     },
     "plugins": [
       [
@@ -35,9 +35,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8a5ae299-c463-421b-aa5f-786b1af4d934"
+        "projectId": "ed5a57f7-176d-41e1-bb41-12ad85598d99"
       }
     },
-    "owner": "entice"
+    "owner": "wetar5"
   }
 }

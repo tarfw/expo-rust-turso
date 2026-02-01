@@ -40,53 +40,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         syncTimeoutRef.current = null;
       }
       try {
-        console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🏦 Fetching tenant info for user: ${userId}`);
+        console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🏦 Initializing database for user: ${userId}`);
 
-        // Fetch profile with tenant info
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select(`
-            tenant_id,
-            tenants (
-              id,
-              turso_url,
-              turso_token
-            )
-          `)
-          .eq('id', userId)
-          .single();
-
-        if (profileError) {
-          if (profileError.code === 'PGRST205') {
-            console.error('❌ Supabase Schema Cache Error: Please refresh your Supabase Dashboard or wait 2 minutes for the new tables to be recognized.');
-          } else {
-            console.error('Error fetching tenant/profile info:', profileError);
-          }
-          return;
-        }
-
-        if (!profile?.tenants) {
-          console.error('❌ No tenant found for this user. Have you linked the user to a tenant in the Supabase database?');
-          return;
-        }
-
-        const tenant = profile.tenants as any;
-        if (!tenant.turso_url || !tenant.turso_token) {
-          console.error('❌ Tenant found but Turso credentials are missing in Supabase.');
-          return;
-        }
-
-        const initializedDb = await databaseManager.initialize(
-          tenant.id,
-          tenant.turso_url,
-          tenant.turso_token,
-          userId
-        );
+        const initializedDb = await databaseManager.initialize(userId);
         setDb(initializedDb);
 
         /* Initial sync moved to useTasks hook to ensure proper UI coordination */
       } catch (err) {
-        console.error('Failed to initialize multi-tenant DB:', err);
+        console.error('Failed to initialize database:', err);
       } finally {
         isInitializingRef.current = false;
       }

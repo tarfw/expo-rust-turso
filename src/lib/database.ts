@@ -10,10 +10,9 @@ if (!TURSO_URL || !TURSO_TOKEN) {
 class DatabaseManager {
   private db: Database | null = null;
   private userId: string | null = null;
-  private currentTenantId: string | null = null;
   private isInitializing: boolean = false;
 
-  async initialize(tenantId: string, url: string, token: string, userId: string): Promise<Database> {
+  async initialize(userId: string, url: string = TURSO_URL, token: string = TURSO_TOKEN): Promise<Database> {
     // Prevent parallel initializations
     if (this.isInitializing) {
       console.log(`[${new Date().toLocaleTimeString('en-GB')}] ⏳ Initialization already in progress, skipping...`);
@@ -27,21 +26,20 @@ class DatabaseManager {
       });
     }
 
-    // Don't re-initialize if already connected to the same tenant
-    if (this.db && this.currentTenantId === tenantId && this.userId === userId) {
-      console.log(`[${new Date().toLocaleTimeString('en-GB')}] ♻️ Database already initialized for this tenant.`);
+    // Don't re-initialize if already connected
+    if (this.db && this.userId === userId) {
+      console.log(`[${new Date().toLocaleTimeString('en-GB')}] ♻️ Database already initialized.`);
       return this.db;
     }
 
     this.isInitializing = true;
     this.userId = userId;
-    this.currentTenantId = tenantId;
-    // Create a local database name per tenant
-    const localDbName = `tenant_${tenantId}.db`;
+    // Use a fixed local database name
+    const localDbName = `silvers_tasks.db`;
     const dbPath = getDbPath(localDbName);
 
     try {
-      console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🔗 Turso DB connection initiated for tenant: ${tenantId}`);
+      console.log(`[${new Date().toLocaleTimeString('en-GB')}] 🔗 Turso DB connection initiated`);
       this.db = new Database({
         path: dbPath,
         url: url,
@@ -196,7 +194,6 @@ class DatabaseManager {
       await this.db.close();
       this.db = null;
       this.userId = null;
-      this.currentTenantId = null;
     }
   }
 }
